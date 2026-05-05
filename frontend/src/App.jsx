@@ -115,12 +115,12 @@ const App = () => {
     setTrendData(null);
 
     // 1. Fire both requests in parallel for maximum speed
-    const aiPromise = fetch(
+    const aiPromise = fetch(`${API_BASE_URL}/analyze`, {
 
       
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: finalQuery 
+      body: JSON.stringify({ query: finalQuery })
     }).then(async res => {
       if (!res.ok) throw new Error('Failed to fetch AI analysis.');
       const aiData = await res.json();
