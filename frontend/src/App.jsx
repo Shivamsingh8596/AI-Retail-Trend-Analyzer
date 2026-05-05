@@ -116,8 +116,6 @@ const App = () => {
 
     // 1. Fire both requests in parallel for maximum speed
     const aiPromise = fetch(`${API_BASE_URL}/analyze`, {
-
-      
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: finalQuery })
