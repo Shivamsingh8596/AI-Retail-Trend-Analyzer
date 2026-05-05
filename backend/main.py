@@ -37,15 +37,9 @@ configure_gemini(0)
 app = FastAPI()
 
 # Enable CORS for React frontend
-ALLOWED_ORIGINS = [
-    os.getenv("FRONTEND_URL", "*"),
-    "http://localhost:5173",
-    "http://localhost:3000"
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"], # Temporarily allow all for debugging
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -232,8 +226,15 @@ async def get_real_products(query: str):
 
 @app.post("/analyze")
 async def analyze_trend(request: AnalysisRequest):
+    print(f"Received Analysis Request for: {request.query}")
     # 1. Fetch real products
-    products = await get_real_products(request.query)
+    try:
+        products = await get_real_products(request.query)
+        print(f"Fetched {len(products)} products from Serper")
+    except Exception as e:
+        print(f"Serper error: {e}")
+        products = []
+
     price_context = "; ".join([f"{p['title']} ({p['price']})" for p in products])
     
     # 2. Build Prompt
