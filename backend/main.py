@@ -126,11 +126,25 @@ async def get_ai_completion(prompt: str, is_json: bool = False):
             text = response.text.strip()
             
             if is_json:
-                if text.startswith("```json"):
-                    text = text[7:-3].strip()
-                elif text.startswith("```"):
-                    text = text[3:-3].strip()
-                result = json.loads(text)
+                # Robust JSON cleaning
+                clean_text = text
+                if "```json" in clean_text:
+                    clean_text = clean_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in clean_text:
+                    clean_text = clean_text.split("```")[1].split("```")[0].strip()
+                
+                try:
+                    result = json.loads(clean_text)
+                except json.JSONDecodeError as e:
+                    print(f"JSON Decode Error on Gemini Key {i+1}: {e}. Text: {clean_text[:100]}...")
+                    # Try a more aggressive cleanup if simple one fails
+                    import re
+                    json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+                    if json_match:
+                        result = json.loads(json_match.group())
+                    else:
+                        raise e
+
                 ai_cache[cache_key] = result
                 save_json_cache(CACHE_FILE_AI, ai_cache) # Save to disk
                 return result, f"Gemini (Key {i+1})"
@@ -321,12 +335,23 @@ async def analyze_image(
             )
             
             text = response.text.strip()
-            if text.startswith("```json"):
-                text = text[7:-3].strip()
-            elif text.startswith("```"):
-                text = text[3:-3].strip()
+            # Robust JSON cleaning
+            clean_text = text
+            if "```json" in clean_text:
+                clean_text = clean_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in clean_text:
+                clean_text = clean_text.split("```")[1].split("```")[0].strip()
+            
+            try:
+                data = json.loads(clean_text)
+            except json.JSONDecodeError:
+                import re
+                json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group())
+                else:
+                    raise
                 
-            data = json.loads(text)
             data["source"] = f"Gemini 2.5 Flash (Key {i+1})"
             
             # Now fetch real products based on the identified trend
@@ -431,8 +456,14 @@ async def get_real_trends(request: AnalysisRequest):
             "term_used": search_term
         }
     except Exception as e:
-        print(f"Pytrends Error: {str(e)}")
-        return {"labels": [], "values": [], "error": str(e)}
+        print(f"Pytrends Error (likely 429): {str(e)}")
+        # Return empty data instead of 500 error
+        return {
+            "labels": ["Data Unavailable"],
+            "values": [0],
+            "error": "Google Trends rate limit reached. Try again later.",
+            "term_used": request.query
+        }
 
 async def get_groq_completion(prompt: str):
     """Chatbot-specific function using Groq with Llama3 fallback and final Gemini safety net."""
