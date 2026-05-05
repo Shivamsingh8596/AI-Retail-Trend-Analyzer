@@ -37,9 +37,15 @@ configure_gemini(0)
 app = FastAPI()
 
 # Enable CORS for React frontend
+ALLOWED_ORIGINS = [
+    os.getenv("FRONTEND_URL", "*"),
+    "http://localhost:5173",
+    "http://localhost:3000"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -444,7 +450,7 @@ async def get_groq_completion(prompt: str):
             payload = {
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": "You are FashAI Assistant, a specialized retail and fashion expert for the Indian market. You MUST ONLY answer questions related to retail, fashion, shopping, jewelry, and lifestyle trends. If a user asks anything else (e.g., math, coding, politics, general knowledge), politely refuse and state that you are only trained for retail and fashion assistance. Max 2 sentences."},
+                    {"role": "system", "content": "You are AI Retail Trend Analyzer Assistant, a specialized retail and fashion expert for the Indian market. You MUST ONLY answer questions related to retail, fashion, shopping, jewelry, and lifestyle trends. If a user asks anything else (e.g., math, coding, politics, general knowledge), politely refuse and state that you are only trained for retail and fashion assistance. Max 2 sentences."},
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.7,
@@ -473,7 +479,7 @@ async def get_groq_completion(prompt: str):
     print("Groq failed. Falling back to Gemini for chatbot...")
     try:
         gemini_prompt = (
-            "You are FashAI Assistant, a specialized retail and fashion expert for India. "
+            "You are AI Retail Trend Analyzer Assistant, a specialized retail and fashion expert for India. "
             "You MUST ONLY answer questions related to retail, fashion, jewelry, and lifestyle trends. "
             "If the user asks about anything else (math, coding, general facts), politely refuse and say you are a retail expert. "
             f"Max 2 sentences.\nUser: {prompt}"
@@ -495,4 +501,5 @@ async def retail_chat(request: AnalysisRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

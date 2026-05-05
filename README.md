@@ -1,8 +1,8 @@
-# FashAI: Professional AI Retail Trend Analyzer 🚀
+# AI Retail Trend Analyzer: Professional Retail Intelligence 🚀
 
-FashAI is a state-of-the-art, production-ready SaaS platform designed for the Indian retail and fashion market. It combines multi-modal AI intelligence with real-time market data to provide actionable insights for retailers, designers, and fashion enthusiasts.
+AI Retail Trend Analyzer is a state-of-the-art, production-ready SaaS platform designed for the Indian retail and fashion market. It combines multi-modal AI intelligence with real-time market data to provide actionable insights for retailers, designers, and fashion enthusiasts.
 
-![FashAI Preview](https://via.placeholder.com/1200x600?text=FashAI+Retail+Intelligence+Dashboard)
+![AI Retail Trend Analyzer Preview](https://via.placeholder.com/1200x600?text=AI+Retail+Trend+Analyzer+Dashboard)
 
 ## 🌟 Key Features
 
@@ -29,7 +29,7 @@ FashAI is a state-of-the-art, production-ready SaaS platform designed for the In
 
 ## 📐 System Architecture
 
-FashAI uses a **Parallel Hybrid Flow** to maximize speed and reliability.
+AI Retail Trend Analyzer uses a **Parallel Hybrid Flow** to maximize speed and reliability.
 
 ```mermaid
 graph TD

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  TrendingUp, 
-  Calendar, 
-  ShoppingBag, 
-  IndianRupee, 
+import {
+  Search,
+  TrendingUp,
+  Calendar,
+  ShoppingBag,
+  IndianRupee,
   Lightbulb,
   ArrowRight,
   Download,
@@ -35,6 +35,8 @@ ChartJS.register(
   Filler
 );
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const App = () => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,7 @@ const App = () => {
 
   const handleExportPDF = async () => {
     if (!reportRef.current) return;
-    
+
     const btn = document.getElementById('export-btn');
     const originalText = btn.innerHTML;
     btn.innerHTML = 'Generating PDF...';
@@ -72,23 +74,23 @@ const App = () => {
         logging: false,
         backgroundColor: "#ffffff"
       });
-      
+
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const { jsPDF } = window.jspdf;
-      
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const imgProps = pdf.getImageProperties(imgData);
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
+
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight);
-      
+
       // Manual download trigger to force filename and extension
       const blob = pdf.output('blob');
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = "FashAI_Trend_Report.pdf";
+      link.download = "AI_Retail_Trend_Analyzer_Report.pdf";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -113,7 +115,7 @@ const App = () => {
     setTrendData(null);
 
     // 1. Fire both requests in parallel for maximum speed
-    const aiPromise = fetch('http://localhost:8000/analyze', {
+    const aiPromise = fetch(`${API_BASE_URL}/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: finalQuery }),
@@ -127,40 +129,40 @@ const App = () => {
     }).catch(err => setError(err.message))
     .finally(() => setLoading(false));
 
-    const trendPromise = fetch('http://localhost:8000/trend-graph', {
+    const trendPromise = fetch(`${API_BASE_URL}/trend-graph`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: finalQuery }),
     }).then(async res => {
-      if (!res.ok) throw new Error('Failed to fetch real-time trends.');
-      const tData = await res.json();
-      setTrendData(tData);
-      return tData;
-    }).catch(err => console.error(err))
+    if (!res.ok) throw new Error('Failed to fetch real-time trends.');
+    const tData = await res.json();
+    setTrendData(tData);
+    return tData;
+  }).catch(err => console.error(err))
     .finally(() => setTrendLoading(false));
 
-    // We don't await them sequentially anymore
-    await Promise.allSettled([aiPromise, trendPromise]);
-  };
+  // We don't await them sequentially anymore
+  await Promise.allSettled([aiPromise, trendPromise]);
+};
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+const handleImageUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-    setSelectedImage(file);
-    setImagePreview(URL.createObjectURL(file));
+  setSelectedImage(file);
+  setImagePreview(URL.createObjectURL(file));
 
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setTrendData(null);
+  setLoading(true);
+  setError(null);
+  setResult(null);
+  setTrendData(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('query', query || 'Analyze the trend in this image');
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('query', query || 'Analyze the trend in this image');
 
-    try {
-      const response = await fetch('http://localhost:8000/analyze-image', {
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze-image`, {
         method: 'POST',
         body: formData,
       });
@@ -188,82 +190,82 @@ const App = () => {
       
       setTrendLoading(true);
       try {
-        const trendResponse = await fetch('http://localhost:8000/trend-graph', {
+        const trendResponse = await fetch(`${API_BASE_URL}/trend-graph`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: trendQuery }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: trendQuery }),
         });
-        const tData = await trendResponse.json();
-        setTrendData(tData);
-      } catch (err) {
-        console.error("Image Trend Graph Error:", err);
-      } finally {
-        setTrendLoading(false);
-      }
+  const tData = await trendResponse.json();
+  setTrendData(tData);
+} catch (err) {
+  console.error("Image Trend Graph Error:", err);
+} finally {
+  setTrendLoading(false);
+}
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+  setError(err.message);
+} finally {
+  setLoading(false);
+}
   };
 
-  const chartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-    datasets: [
-      {
-        label: 'Predicted Trend Index',
-        data: result?.chart_data || [12, 19, 15, 25, 32],
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99, 102, 241, 0.5)',
-        tension: 0.4,
-      },
-    ],
-  };
-
-  const realTimeChartData = {
-    labels: trendData?.labels || [],
-    datasets: [
-      {
-        label: 'Real-time Interest Score',
-        data: trendData?.values || [],
-        borderColor: '#f43f5e',
-        backgroundColor: 'rgba(244, 63, 94, 0.5)',
-        tension: 0.3,
-        fill: true,
-      },
-    ],
-  };
-
-  const chartOptions = (title) => ({
-    responsive: true,
-    plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: title },
+const chartData = {
+  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+  datasets: [
+    {
+      label: 'Predicted Trend Index',
+      data: result?.chart_data || [12, 19, 15, 25, 32],
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99, 102, 241, 0.5)',
+      tension: 0.4,
     },
-    scales: {
-      x: {
-        title: {
-          display: true,
-          text: 'Month/Year',
-          color: '#64748b',
-          font: { weight: 'bold' }
-        }
-      },
-      y: { 
-        beginAtZero: true, 
-        max: 100,
-        title: {
-          display: true,
-          text: 'Search Interest Score',
-          color: '#64748b',
-          font: { weight: 'bold' }
-        }
+  ],
+};
+
+const realTimeChartData = {
+  labels: trendData?.labels || [],
+  datasets: [
+    {
+      label: 'Real-time Interest Score',
+      data: trendData?.values || [],
+      borderColor: '#f43f5e',
+      backgroundColor: 'rgba(244, 63, 94, 0.5)',
+      tension: 0.3,
+      fill: true,
+    },
+  ],
+};
+
+const chartOptions = (title) => ({
+  responsive: true,
+  plugins: {
+    legend: { position: 'top' },
+    title: { display: true, text: title },
+  },
+  scales: {
+    x: {
+      title: {
+        display: true,
+        text: 'Month/Year',
+        color: '#64748b',
+        font: { weight: 'bold' }
+      }
+    },
+    y: {
+      beginAtZero: true,
+      max: 100,
+      title: {
+        display: true,
+        text: 'Search Interest Score',
+        color: '#64748b',
+        font: { weight: 'bold' }
       }
     }
-  });
+  }
+});
 
-  return (
-    <>
+return (
+  <>
     <div className="app-container">
       <header>
         <h1>AI Retail Trend Analyzer</h1>
@@ -271,25 +273,25 @@ const App = () => {
       </header>
 
       <div className="search-section">
-        <input 
-          type="text" 
-          placeholder="e.g., Diwali fashion trends, Wedding jewelry..." 
+        <input
+          type="text"
+          placeholder="e.g., Diwali fashion trends, Wedding jewelry..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && analyzeTrend()}
         />
-        <input 
-          type="file" 
-          id="image-upload" 
-          hidden 
-          accept="image/*" 
+        <input
+          type="file"
+          id="image-upload"
+          hidden
+          accept="image/*"
           onChange={handleImageUpload}
         />
         <label htmlFor="image-upload" className="upload-btn" title="Upload image for analysis">
           <ImageIcon size={24} />
         </label>
-        <button 
-          className="analyze-btn" 
+        <button
+          className="analyze-btn"
           onClick={() => analyzeTrend()}
           disabled={loading || trendLoading}
         >
@@ -305,7 +307,7 @@ const App = () => {
         <div className="image-preview-container" style={{ textAlign: 'center', marginBottom: '20px' }}>
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <img src={imagePreview} alt="Preview" style={{ maxWidth: '200px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-            <button 
+            <button
               onClick={() => { setImagePreview(null); setSelectedImage(null); }}
               style={{ position: 'absolute', top: '-10px', right: '-10px', background: '#f43f5e', color: 'white', border: 'none', borderRadius: '50%', width: '25px', height: '25px', cursor: 'pointer' }}
             >
@@ -318,8 +320,8 @@ const App = () => {
 
       <div className="suggestions">
         {suggestions.map((s, i) => (
-          <button 
-            key={i} 
+          <button
+            key={i}
             className="suggestion-chip"
             onClick={() => {
               setQuery(s);
@@ -332,8 +334,8 @@ const App = () => {
       </div>
 
       {sourceInfo === "Ollama" && (
-        <div style={{ 
-          backgroundColor: '#fef3c7', color: '#92400e', padding: '10px', borderRadius: '8px', 
+        <div style={{
+          backgroundColor: '#fef3c7', color: '#92400e', padding: '10px', borderRadius: '8px',
           marginBottom: '20px', textAlign: 'center', fontSize: '0.9rem', border: '1px solid #fde68a'
         }}>
           ⚠️ Switching...
@@ -341,8 +343,8 @@ const App = () => {
       )}
 
       {sourceInfo === "Cache" && (
-        <div style={{ 
-          backgroundColor: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '8px', 
+        <div style={{
+          backgroundColor: '#d1fae5', color: '#065f46', padding: '10px', borderRadius: '8px',
           marginBottom: '20px', textAlign: 'center', fontSize: '0.9rem', border: '1px solid #a7f3d0'
         }}>
           ⚡ <strong>Instant!</strong> Results loaded from cache.
@@ -387,7 +389,7 @@ const App = () => {
                 <p>{result.growth_reason}</p>
               </div>
             </div>
-            
+
             {result.real_products && result.real_products.length > 0 && (
               <div className="products-section" style={{ marginTop: '2rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem' }}>
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px', color: '#1e293b' }}>
@@ -395,8 +397,8 @@ const App = () => {
                 </h3>
                 <div className="product-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '20px' }}>
                   {result.real_products.map((prod, idx) => (
-                    <div key={idx} className="product-card" style={{ 
-                      background: '#f8fafc', padding: '12px', borderRadius: '12px', 
+                    <div key={idx} className="product-card" style={{
+                      background: '#f8fafc', padding: '12px', borderRadius: '12px',
                       display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid #e2e8f0',
                       transition: 'transform 0.2s'
                     }}>
@@ -410,12 +412,12 @@ const App = () => {
                         <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '0.9rem' }}>{prod.price}</span>
                         <span style={{ fontSize: '0.7rem', color: '#64748b' }}>via {prod.source}</span>
                       </div>
-                      <a 
-                        href={prod.link} 
-                        target="_blank" 
+                      <a
+                        href={prod.link}
+                        target="_blank"
                         rel="noopener noreferrer"
-                        style={{ 
-                          textAlign: 'center', backgroundColor: '#6366f1', color: 'white', 
+                        style={{
+                          textAlign: 'center', backgroundColor: '#6366f1', color: 'white',
                           padding: '6px', borderRadius: '6px', fontSize: '0.8rem', textDecoration: 'none',
                           marginTop: '4px'
                         }}
@@ -435,10 +437,10 @@ const App = () => {
               </div>
             ) : trendData && trendData.labels.length > 0 ? (
               <div className="chart-container" style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '1rem' }}>
-                <Line 
+                <Line
                   key={`real-${JSON.stringify(trendData.values)}`}
-                  data={realTimeChartData} 
-                  options={chartOptions('Real Google Trends Growth (Last 2 Years)')} 
+                  data={realTimeChartData}
+                  options={chartOptions('Real Google Trends Growth (Last 2 Years)')}
                 />
               </div>
             ) : null}
@@ -446,9 +448,9 @@ const App = () => {
 
           <div className="export-section" style={{ marginTop: '2rem', textAlign: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '2rem' }}>
             <h3 style={{ marginBottom: '1rem', color: '#1e293b' }}>Export Analysis Report</h3>
-            <button 
+            <button
               id="export-btn"
-              className="analyze-btn" 
+              className="analyze-btn"
               onClick={handleExportPDF}
               style={{ backgroundColor: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '10px' }}
             >
@@ -458,11 +460,11 @@ const App = () => {
         </div>
       )}
     </div>
-    
+
     {/* Floating Chatbot - Moved outside main container */}
     <ChatBot />
-    </>
-  );
+  </>
+);
 };
 
 const ChatBot = () => {
@@ -491,13 +493,13 @@ const ChatBot = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/chat', {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: input }),
       });
       const data = await response.json();
-      const text = data.source === "Ollama" ? `${data.response} (via Local Ollama)` : data.response;
+      const text = data.source === "Ollama" ? `${ data.response }(via Local Ollama)` : data.response;
       setMessages(prev => [...prev, { text: text, isBot: true }]);
     } catch (err) {
       setMessages(prev => [...prev, { text: "Sorry, I'm having trouble connecting right now.", isBot: true }]);
@@ -528,7 +530,7 @@ const ChatBot = () => {
           <div style={{ padding: '15px 20px', backgroundColor: '#6366f1', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <TrendingUp size={18} />
-              <span style={{ fontWeight: 'bold' }}>FashAI Assistant</span>
+              <span style={{ fontWeight: 'bold' }}>AI Retail Trend Analyzer Assistant</span>
             </div>
             <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '20px' }}>×</button>
           </div>
