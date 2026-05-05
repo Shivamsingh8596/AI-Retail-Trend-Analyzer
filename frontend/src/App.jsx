@@ -118,7 +118,7 @@ const App = () => {
     const aiPromise = fetch(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: finalQuery }),
+      body: JSON.stringify({ query: finalQuery 
     }).then(async res => {
       if (!res.ok) throw new Error('Failed to fetch AI analysis.');
       const aiData = await res.json();
