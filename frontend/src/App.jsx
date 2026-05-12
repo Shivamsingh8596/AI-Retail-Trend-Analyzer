@@ -124,7 +124,6 @@ const App = () => {
       const aiData = await res.json();
       setResult(aiData);
       setSourceInfo(aiData.source);
-      if (aiData.source === "Ollama") setTimeout(() => setSourceInfo(null), 5000);
       return aiData;
     }).catch(err => setError(err.message))
     .finally(() => setLoading(false));
@@ -178,10 +177,6 @@ const handleImageUpload = async (e) => {
 
       setResult(data);
       setSourceInfo(data.source);
-
-      if (data.source.includes("Ollama")) {
-        setTimeout(() => setSourceInfo(null), 5000);
-      }
       
       // Fetch Graph specifically for the image trend
       const trendQuery = (typeof data.current_trends === 'string') 
@@ -333,14 +328,7 @@ return (
         ))}
       </div>
 
-      {sourceInfo === "Ollama" && (
-        <div style={{
-          backgroundColor: '#fef3c7', color: '#92400e', padding: '10px', borderRadius: '8px',
-          marginBottom: '20px', textAlign: 'center', fontSize: '0.9rem', border: '1px solid #fde68a'
-        }}>
-          ⚠️ Switching...
-        </div>
-      )}
+
 
       {sourceInfo === "Cache" && (
         <div style={{
@@ -499,7 +487,7 @@ const ChatBot = () => {
         body: JSON.stringify({ query: input }),
       });
       const data = await response.json();
-      const text = data.source === "Ollama" ? `${ data.response }(via Local Ollama)` : data.response;
+      const text = data.response;
       setMessages(prev => [...prev, { text: text, isBot: true }]);
     } catch (err) {
       setMessages(prev => [...prev, { text: "Sorry, I'm having trouble connecting right now.", isBot: true }]);

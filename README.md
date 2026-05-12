@@ -8,7 +8,7 @@ AI Retail Trend Analyzer is a state-of-the-art, production-ready SaaS platform d
 
 - **Visual Intelligence**: Identify trends and products directly from images using **Gemini 2.5 Flash**.
 - **Real-time Market Data**: Integrates with **Serper API** (Google Shopping) and **PyTrends** (Google Trends) for live pricing and popularity graphs.
-- **Hybrid AI Fallback**: A resilient architecture that switches between **Gemini**, **Groq**, and **Local Ollama** models to ensure 100% uptime.
+- **Hybrid AI Architecture**: A resilient system that uses **Gemini 2.5 Flash** as the primary engine for text and image analysis, with an automatic fallback to **Groq (Llama 3.3 & Llama 3.2 Vision)** to ensure maximum availability.
 - **Ultra-Fast Performance**: Parallel API processing and multi-layer persistent caching for near-instant results.
 - **Domain-Specific Chatbot**: A high-speed assistant powered by **Groq Llama 3.3**, strictly locked to the retail and fashion domain.
 - **Persistent Memory**: Automatically saves analyses to disk (`ai_cache.json`) to save API costs and improve speed for repeat queries.
@@ -21,7 +21,7 @@ AI Retail Trend Analyzer is a state-of-the-art, production-ready SaaS platform d
 | :--- | :--- |
 | **Frontend** | React.js, Vite, Tailwind CSS, Chart.js, Lucide Icons |
 | **Backend** | Python, FastAPI, Uvicorn, Asyncio |
-| **AI Models** | Gemini 2.5 Flash, Groq (Llama 3.3), Ollama (Llama 3.2 & Moondream) |
+| **AI Models** | Gemini 2.5 Flash, Groq (Llama 3.3) |
 | **Data APIs** | Serper Shopping API, Google Trends (PyTrends) |
 | **Storage** | Persistent JSON-based Cache Files |
 
@@ -36,17 +36,17 @@ graph TD
     User([User]) --> Input{Input Type}
     
     Input -- "Text/Image" --> AI[Gemini 2.5 Flash]
-    AI -- "Fail" --> Local[Local Ollama Fallback]
+    AI -- "Fail (Text/Vision)" --> GroqFallback[Groq Llama 3.3 / 3.2V Backup]
     
-    AI & Local --> Cache[(Persistent Cache)]
+    AI & GroqFallback --> Cache[(Persistent Cache)]
     
-    AI & Local --> Serper[Serper API: Real Products]
-    AI & Local --> Trends[PyTrends: 2-Year Graph]
+    AI & GroqFallback --> Serper[Serper API: Real Products]
+    AI & GroqFallback --> Trends[PyTrends: 2-Year Graph]
     
     Serper & Trends --> Dashboard([Rich UI Dashboard])
     
-    Input -- "Chat" --> Groq[Groq Llama 3.3]
-    Groq --> Chatbot([Instant Chat Response])
+    Input -- "Chat" --> GroqChat[Groq Llama 3.3]
+    GroqChat --> Chatbot([Instant Chat Response])
 ```
 
 ---
@@ -56,7 +56,6 @@ graph TD
 ### 1. Prerequisites
 - Python 3.9+
 - Node.js & npm
-- [Ollama](https://ollama.com/) (For local fallback support)
 
 ### 2. Environment Setup
 Create a `.env` file in the `backend` directory:

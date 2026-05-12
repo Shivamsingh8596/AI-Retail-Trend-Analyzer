@@ -85,7 +85,7 @@ def get_image_hash(image_bytes: bytes):
     return hashlib.md5(image_bytes).hexdigest()
 
 async def get_ai_completion(prompt: str, is_json: bool = False):
-    """Unified function with Caching and Gemini -> Ollama fallback."""
+    """Unified function with Caching and Gemini analysis."""
     # Normalize query for cache
     cache_key = prompt.strip().lower()
     
@@ -149,41 +149,56 @@ async def get_ai_completion(prompt: str, is_json: bool = False):
             
         except asyncio.TimeoutError:
             print(f"Gemini Key {i+1} timed out.")
-        except Exception as gemini_err:
-            print(f"Gemini Key {i+1} error: {str(gemini_err)}")
-            await asyncio.sleep(3)
-            continue
+    # 3. Fallback to Groq
+    if GROQ_API_KEY:
+        try:
+            print("All Gemini keys exhausted. Attempting Groq fallback...")
+            models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+            for model in models:
+                try:
+                    url = "https://api.groq.com/openai/v1/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {GROQ_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": "You are a retail expert. Output ONLY valid JSON." if is_json else "You are a retail expert."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.7,
+                        "response_format": {"type": "json_object"} if is_json else None
+                    }
+                    
+                    response = await asyncio.to_thread(
+                        requests.post, 
+                        url, 
+                        headers=headers, 
+                        json=payload, 
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        text = response.json()["choices"][0]["message"]["content"].strip()
+                        if is_json:
+                            result = json.loads(text)
+                            ai_cache[cache_key] = result
+                            save_json_cache(CACHE_FILE_AI, ai_cache)
+                            return result, f"Groq ({model})"
+                        
+                        ai_cache[cache_key] = text
+                        save_json_cache(CACHE_FILE_AI, ai_cache)
+                        return text, f"Groq ({model})"
+                    else:
+                        print(f"Groq {model} failed with status: {response.status_code}")
+                except Exception as inner_e:
+                    print(f"Groq {model} attempt failed: {inner_e}")
+                    continue
+        except Exception as e:
+            print(f"Groq fallback overall failed: {e}")
 
-    # 2. Fallback to Ollama
-    try:
-        print(f"All Gemini keys exhausted. Waiting 3s then attempting Ollama fallback...")
-        await asyncio.sleep(3)
-        ollama_response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "llama3.2:latest",
-                "prompt": f"You are a retail expert. Output ONLY valid JSON for this prompt: {prompt}" if is_json else prompt,
-                "stream": False,
-                "format": "json" if is_json else ""
-            },
-            timeout=30 # Increased timeout for local LLM analysis
-        )
-        if ollama_response.status_code == 200:
-            result = ollama_response.json().get("response", "")
-            if is_json:
-                result_json = json.loads(result)
-                ai_cache[cache_key] = result_json
-                save_json_cache(CACHE_FILE_AI, ai_cache) # Save to disk
-                return result_json, "Ollama"
-            ai_cache[cache_key] = result
-            save_json_cache(CACHE_FILE_AI, ai_cache) # Save to disk
-            return result, "Ollama"
-        else:
-            print(f"Ollama returned error: {ollama_response.status_code}")
-    except Exception as ollama_err:
-        print(f"Ollama also failed: {str(ollama_err)}")
-    
-    raise HTTPException(status_code=500, detail="Both AI services (Gemini & Ollama) are currently unavailable. Please try again in a few minutes.")
+    raise HTTPException(status_code=500, detail="All AI services (Gemini & Groq) are currently unavailable. Please try again in a few minutes.")
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
@@ -272,7 +287,7 @@ async def prepare_image_for_ai(file: UploadFile):
     """
     Converter function:
     Gemini needs -> binary (bytes)
-    Ollama needs -> base64 string
+    Groq Vision needs -> base64 string
     """
     image_bytes = await file.read()
     base64_string = base64.b64encode(image_bytes).decode('utf-8')
@@ -375,47 +390,67 @@ async def analyze_image(
             await asyncio.sleep(3)
             continue
 
-    # 2. Fallback to Ollama Vision
-    try:
-        print("All Gemini Vision keys failed. Waiting 3s then attempting Moondream Vision fallback...")
-        await asyncio.sleep(3)
-        ollama_prompt = f"Analyze this fashion image. Use ONLY descriptive strings (no coordinates or numbers). If NOT fashion/retail, return JSON with is_valid: false, error: 'Incorrect image: Please upload an image related to retail fashion.'. If it IS fashion, return JSON with is_valid: true, current_trends: 'description string', upcoming_trends: 'description string', popular_products: 'item list', budget_suggestions: 'price string', growth_reason: 'reason string', chart_data: [5 ints]. Context: {query}"
-        
-        ollama_response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "moondream",
-                "prompt": ollama_prompt,
-                "images": [base64_image],
-                "stream": False,
-                "format": "json"
-            },
-            timeout=90 # Increased for first-time loading
-        )
-        
-        if ollama_response.status_code == 200:
-            result = ollama_response.json().get("response", "")
-            data = json.loads(result)
-            data["source"] = "Ollama (Moondream)"
+    # 2. Fallback to Groq Vision
+    if GROQ_API_KEY:
+        try:
+            print("All Gemini Vision keys failed. Attempting Groq Vision fallback...")
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            }
             
-            # Fetch real products based on identified trend
-            search_query = data.get("current_trends", query)
-            data["real_products"] = await get_real_products(search_query)
+            # Using Llama 3.2 11B Vision
+            payload = {
+                "model": "llama-3.2-11b-vision-preview",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "temperature": 0.7,
+                "response_format": {"type": "json_object"}
+            }
             
-            # Save to Cache
-            cached_data = data.copy()
-            cached_data["source"] = "Cache"
-            image_cache[image_hash] = cached_data
-            save_json_cache(CACHE_FILE_IMAGE, image_cache) # Save to disk
+            response = await asyncio.to_thread(
+                requests.post, 
+                url, 
+                headers=headers, 
+                json=payload, 
+                timeout=20
+            )
             
-            return data
-        else:
-            print(f"Ollama Moondream returned status: {ollama_response.status_code}")
-            
-    except Exception as ollama_err:
-        print(f"Ollama Vision (Moondream) failed: {str(ollama_err)}")
-        
-    raise HTTPException(status_code=500, detail="Image analysis failed on both cloud and local AI. Please ensure Ollama is running.")
+            if response.status_code == 200:
+                result = response.json()["choices"][0]["message"]["content"].strip()
+                data = json.loads(result)
+                data["source"] = "Groq (Llama-3.2-Vision)"
+                
+                # Fetch real products based on identified trend
+                search_query = data.get("current_trends", query)
+                data["real_products"] = await get_real_products(search_query)
+                
+                # Save to Cache
+                cached_data = data.copy()
+                cached_data["source"] = "Cache"
+                image_cache[image_hash] = cached_data
+                save_json_cache(CACHE_FILE_IMAGE, image_cache)
+                
+                return data
+            else:
+                print(f"Groq Vision failed with status: {response.status_code}")
+        except Exception as groq_e:
+            print(f"Groq Vision fallback failed: {groq_e}")
+
+    raise HTTPException(status_code=500, detail="Image analysis failed on all available AI services.")
 
 @app.post("/trend-graph")
 async def get_real_trends(request: AnalysisRequest):
